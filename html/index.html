@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newspaper Editor</title>
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: transparent;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+        }
+
+        #editor-wrapper {
+            display: none;
+            width: 210mm;
+            min-height: 297mm;
+            max-width: 210mm;
+            background: white;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        #editor-container {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            border: none;
+        }
+
+        #buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        #publish-btn {
+            background-color: green;
+            border-color: white;
+            color: white;
+            border-radius: 10px;
+        }
+
+        #close-btn {
+            background-color: red;
+            border-color: white;
+            color: white;
+            border-radius: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .toolbar-hidden .ql-toolbar {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="editor-wrapper">
+        <div id="editor-container"></div>
+        <div id="buttons">
+            <button id="publish-btn" onclick="publish()">Veröffentlichen</button>
+            <button id="close-btn" onclick="closeEditor()">Schließen</button>
+        </div>
+    </div>
+
+    <div id="overlay"></div>
+
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <script>
+        let quill;
+        let isEditorMode = false;
+        let lastContent = '';
+
+        document.addEventListener("DOMContentLoaded", () => {
+            quill = new Quill('#editor-container', {
+                theme: 'snow',
+                modules: {
+                    toolbar: [
+                        [{ header: [1, 2, 3, false] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ 'align': [] }],
+                        ['link', 'image'],
+                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                        ['clean']
+                    ]
+                },
+                placeholder: 'Schreibe hier deine Zeitung...'
+            });
+        });
+
+        window.addEventListener('message', (event) => {
+            if (event.data.action === 'openEditor') {
+                openEditor();
+            } else if (event.data.action === 'viewNewspaper') {
+                viewNewspaper(event.data.content);
+            } else if (event.data.action === 'closeEditor') {
+                closeEditor();
+            }
+        });
+
+        function openEditor() {
+            document.getElementById('editor-wrapper').style.display = 'block';
+            isEditorMode = true;
+            updateUI();
+            SetFocus(true);
+            quill.enable();
+            quill.setText('');
+            quill.root.innerHTML = lastContent;
+        }
+
+        function viewNewspaper(content) {
+            document.getElementById('editor-wrapper').style.display = 'block';
+            lastContent = content;
+            quill.setText(' ');
+            quill.root.innerHTML = content;
+            quill.disable();
+            isEditorMode = false;
+            updateUI();
+            SetFocus(true);
+        }
+
+        function updateUI() {
+            if (isEditorMode) {
+                document.querySelector('#publish-btn').style.display = 'inline-block';
+                document.getElementById('editor-wrapper').classList.remove('toolbar-hidden');
+                quill.enable();
+            } else {
+                document.querySelector('#publish-btn').style.display = 'none';
+                document.getElementById('editor-wrapper').classList.add('toolbar-hidden');
+                quill.disable();
+            }
+        }
+
+        function SetFocus(enable) {
+            if (enable) {
+                document.body.style.pointerEvents = 'none';
+                document.getElementById('editor-wrapper').style.pointerEvents = 'auto';
+            } else {
+                document.body.style.pointerEvents = 'auto';
+                document.getElementById('editor-wrapper').style.pointerEvents = 'none';
+            }
+        }
+
+        function closeEditor() {
+            document.getElementById('editor-wrapper').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+            SetFocus(false);
+            fetch(`https://${GetParentResourceName()}/close`, { method: 'POST' });
+        }
+
+        function publish() {
+            const content = quill.root.innerHTML;
+            fetch(`https://${GetParentResourceName()}/publish`, {
+                method: 'POST',
+                body: JSON.stringify({ content }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    </script>
+</body>
+</html>
